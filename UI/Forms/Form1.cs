@@ -179,9 +179,19 @@ public partial class Form1 : Form
         if (e.Button != MouseButtons.Left) return;
 
         _isDrawing = true;
-        _rawPath.Clear();
-        // Ajustar primer punto a la cuadrícula
-        _rawPath.Add(SnapToGrid(e.Location));
+        PointF snapped = SnapToGrid(e.Location);
+
+        // Si el trazo nuevo empieza en el final del anterior → continuar (útil tras zoom)
+        // Si empieza en cualquier otro punto → reiniciar desde cero
+        if (_rawPath.Count > 0 && Distance(snapped, _rawPath[^1]) < GridSize * 0.5f)
+        {
+            // Punto de inicio = final del trazo anterior: continuar sin borrar
+        }
+        else
+        {
+            _rawPath.Clear();
+            _rawPath.Add(snapped);
+        }
         RebuildPlan();
     }
 
