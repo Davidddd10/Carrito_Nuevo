@@ -16,7 +16,7 @@ volatile long contadorPulsos = 0;
 volatile unsigned long ultimoTiempoPulso = 0;
 
 // --- MATEMÁTICAS ORIGINALES DE RUTA ---
-const float CM_POR_PULSO = 1.2; //1.45 //1.16
+const float CM_POR_PULSO = 1.41; //1.2 //1.45 //1.16
 const float COMPENSACION_INERCIA = 1.0;
 
 // --- COMPENSACIÓN DE DERIVA (PRE-GIRO A LA DERECHA) ---
