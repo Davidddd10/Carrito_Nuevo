@@ -25,7 +25,7 @@ const float COMPENSACION_INERCIA = 1.0;
 // VALOR POSITIVO = giro a la DERECHA  ←  esto es lo que se aplica.
 // Si el carrito AÚN va a la IZQUIERDA: SUBE ANGULO_CORRECCION_DERIVA.
 // Si el carrito empieza a ir a la DERECHA:  BÁJALO.
-const int ANGULO_CORRECCION_DERIVA = 9; // grados DERECHA (positivo) antes de cada recta
+const int ANGULO_CORRECCION_DERIVA = 14; // grados DERECHA (positivo) antes de cada recta
 
 // --- AJUSTES DE INERCIA Y TRACCIÓN ---
 int potenciaIzq = 100;  // 200
