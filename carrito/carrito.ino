@@ -16,7 +16,7 @@ volatile long contadorPulsos = 0;
 volatile unsigned long ultimoTiempoPulso = 0;
 
 // --- MATEMÁTICAS ORIGINALES DE RUTA ---
-const float CM_POR_PULSO = 1.09; //1.45 //1.16
+const float CM_POR_PULSO = 1.2; //1.45 //1.16
 const float COMPENSACION_INERCIA = 1.0;
 
 // --- COMPENSACIÓN DE DERIVA (PRE-GIRO A LA DERECHA) ---
@@ -25,7 +25,8 @@ const float COMPENSACION_INERCIA = 1.0;
 // VALOR POSITIVO = giro a la DERECHA  ←  esto es lo que se aplica.
 // Si el carrito AÚN va a la IZQUIERDA: SUBE ANGULO_CORRECCION_DERIVA.
 // Si el carrito empieza a ir a la DERECHA:  BÁJALO.
-const int ANGULO_CORRECCION_DERIVA = 16; // grados DERECHA (positivo) antes de cada recta
+const int ANGULO_CORRECCION_DERIVA = 12; // grados DERECHA (positivo) antes de cada recta
+const int ANGULO_EXTRA_IZQ = 6;          // grados extra en giros a la IZQUIERDA (90 -> 96)
 
 // --- AJUSTES DE INERCIA Y TRACCIÓN ---
 int potenciaIzq = 100;  // 200
@@ -230,15 +231,15 @@ void ejecutarRutaAutonoma() {
     if (!enModoAuto) break;
 
     // Giro + corrección de deriva en un solo jalón:
-    // - Derecha (angulo>0): angulo + ANGULO_CORRECCION_DERIVA  (ej. 90+14 = 104°)
-    // - Izquierda (angulo<0): angulo exacto, sin corrección añadida
-    // - Recto (angulo==0): solo los 14° de corrección de deriva
+    // - Derecha (angulo>0): angulo + ANGULO_CORRECCION_DERIVA  (ej. 90+12 = 102°)
+    // - Izquierda (angulo<0): angulo - ANGULO_EXTRA_IZQ        (ej. -90-6 = -96°)
+    // - Recto (angulo==0): solo los 12° de corrección de deriva
     {
       int anguloFinal;
       if (ruta[i].angulo > 0) {
         anguloFinal = ruta[i].angulo + ANGULO_CORRECCION_DERIVA;
       } else if (ruta[i].angulo < 0) {
-        anguloFinal = ruta[i].angulo;
+        anguloFinal = ruta[i].angulo - ANGULO_EXTRA_IZQ;
       } else {
         anguloFinal = ANGULO_CORRECCION_DERIVA;
       }
