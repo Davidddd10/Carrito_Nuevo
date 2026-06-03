@@ -25,7 +25,7 @@ const float COMPENSACION_INERCIA = 1.0;
 // VALOR POSITIVO = giro a la DERECHA  ←  esto es lo que se aplica.
 // Si el carrito AÚN va a la IZQUIERDA: SUBE ANGULO_CORRECCION_DERIVA.
 // Si el carrito empieza a ir a la DERECHA:  BÁJALO.
-const int ANGULO_CORRECCION_DERIVA = 14; // grados DERECHA (positivo) antes de cada recta
+const int ANGULO_CORRECCION_DERIVA = 16; // grados DERECHA (positivo) antes de cada recta
 
 // --- AJUSTES DE INERCIA Y TRACCIÓN ---
 int potenciaIzq = 100;  // 200
@@ -229,12 +229,23 @@ void ejecutarRutaAutonoma() {
   for (int i = 0; i < totalSegmentos; i++) {
     if (!enModoAuto) break;
 
-    // 1. Giro intencional del segmento (curvas de la ruta)
-    if (abs(ruta[i].angulo) >= 5) {
-      ejecutarGiro(ruta[i].angulo);
+    // Giro + corrección de deriva en un solo jalón:
+    // - Derecha (angulo>0): angulo + ANGULO_CORRECCION_DERIVA  (ej. 90+14 = 104°)
+    // - Izquierda (angulo<0): angulo exacto, sin corrección añadida
+    // - Recto (angulo==0): solo los 14° de corrección de deriva
+    {
+      int anguloFinal;
+      if (ruta[i].angulo > 0) {
+        anguloFinal = ruta[i].angulo + ANGULO_CORRECCION_DERIVA;
+      } else if (ruta[i].angulo < 0) {
+        anguloFinal = ruta[i].angulo;
+      } else {
+        anguloFinal = ANGULO_CORRECCION_DERIVA;
+      }
+      if (abs(anguloFinal) >= 5) {
+        ejecutarGiro(anguloFinal);
+      }
     }
-    // 2. Corrección de deriva: giro derecha SIEMPRE antes de cada recta
-    ejecutarGiro(ANGULO_CORRECCION_DERIVA);
 
     if (ruta[i].distancia > 0) {
       contadorPulsos = 0; // Se resetea DESPUÉS del giro: el avance mide distancia limpia
