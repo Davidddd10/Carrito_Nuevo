@@ -28,6 +28,8 @@ public partial class Form1 : Form
     private bool _hasCartTelemetry;
     private bool _manualMode = false;
     private readonly System.Windows.Forms.Timer _manualBlinkTimer = new() { Interval = 300 };
+    // Cursor de dibujo por teclado (coordenadas de canvas, null = no colocado aún)
+    private PointF? _keyCursor;
 
     public Form1()
     {
@@ -95,44 +97,131 @@ public partial class Form1 : Form
 
     private void Form1_KeyDown(object? sender, KeyEventArgs e)
     {
-        if (!_manualMode) return;
-
-        try
+        if (_manualMode)
         {
-            switch (e.KeyCode)
+            // --- MODO MANUAL: flechas controlan el carrito por Wi-Fi ---
+            try
             {
-                case Keys.Up:
-                    _wifiClient.SendManualCommand("FORWARD");
-                    HighlightArrow(lblArrowUp);
-                    break;
-                case Keys.Down:
-                    _wifiClient.SendManualCommand("BACK");
-                    HighlightArrow(lblArrowDown);
-                    break;
-                case Keys.Left:
-                    _wifiClient.SendManualCommand("LEFT");
-                    HighlightArrow(lblArrowLeft);
-                    break;
-                case Keys.Right:
-                    _wifiClient.SendManualCommand("RIGHT");
-                    HighlightArrow(lblArrowRight);
-                    break;
-                case Keys.Space:
-                    _wifiClient.SendManualCommand("STOP");
-                    // Indicar stop con parpadeo de los cuatro
-                    HighlightArrow(lblArrowUp);
-                    HighlightArrow(lblArrowDown);
-                    HighlightArrow(lblArrowLeft);
-                    HighlightArrow(lblArrowRight);
-                    break;
+                switch (e.KeyCode)
+                {
+                    case Keys.Up:
+                        _wifiClient.SendManualCommand("FORWARD");
+                        HighlightArrow(lblArrowUp);
+                        break;
+                    case Keys.Down:
+                        _wifiClient.SendManualCommand("BACK");
+                        HighlightArrow(lblArrowDown);
+                        break;
+                    case Keys.Left:
+                        _wifiClient.SendManualCommand("LEFT");
+                        HighlightArrow(lblArrowLeft);
+                        break;
+                    case Keys.Right:
+                        _wifiClient.SendManualCommand("RIGHT");
+                        HighlightArrow(lblArrowRight);
+                        break;
+                    case Keys.Space:
+                        _wifiClient.SendManualCommand("STOP");
+                        HighlightArrow(lblArrowUp);
+                        HighlightArrow(lblArrowDown);
+                        HighlightArrow(lblArrowLeft);
+                        HighlightArrow(lblArrowRight);
+                        break;
+                }
             }
-        }
-        catch (Exception ex)
-        {
-            // No interrumpir funcionamiento normal
-            SetStatus($"Error comando manual: {ex.Message}", Color.Firebrick);
+            catch (Exception ex)
+            {
+                SetStatus($"Error comando manual: {ex.Message}", Color.Firebrick);
+            }
+            return;
         }
 
+        // --- MODO AUTÓNOMO: flechas dibujan la ruta en el canvas ---
+        switch (e.KeyCode)
+        {
+            case Keys.Up:
+            case Keys.Down:
+            case Keys.Left:
+            case Keys.Right:
+                MoveKeyCursor(e.KeyCode);
+                e.Handled = true;
+                e.SuppressKeyPress = true;
+                break;
+            case Keys.Back:
+                UndoLastKeyStep();
+                e.Handled = true;
+                e.SuppressKeyPress = true;
+                break;
+        }
+    }
+
+    // Mueve el cursor de teclado una celda en la dirección indicada y añade el punto al trazo
+    private void MoveKeyCursor(Keys direction)
+    {
+        // Si el cursor no está colocado, iniciarlo en el centro del canvas
+        if (_keyCursor == null)
+        {
+            float cx = MathF.Round((picLienzo.Width / _zoom) / 2f / GridSize) * GridSize;
+            float cy = MathF.Round((picLienzo.Height / _zoom) / 2f / GridSize) * GridSize;
+            _keyCursor = new PointF(cx, cy);
+        }
+
+        PointF current = _keyCursor.Value;
+
+        // Primer punto: poner el origen si el trazo está vacío o si el cursor coincide con el final
+        if (_rawPath.Count == 0)
+        {
+            _rawPath.Add(current);
+        }
+        else if (Distance(_rawPath[^1], current) > GridSize * 0.5f)
+        {
+            // El cursor fue recolocado con el ratón en otro punto: reiniciar desde ahí
+            _rawPath.Clear();
+            _rawPath.Add(current);
+        }
+
+        PointF next = direction switch
+        {
+            Keys.Up    => new PointF(current.X, current.Y - GridSize),
+            Keys.Down  => new PointF(current.X, current.Y + GridSize),
+            Keys.Left  => new PointF(current.X - GridSize, current.Y),
+            Keys.Right => new PointF(current.X + GridSize, current.Y),
+            _          => current
+        };
+
+        // Mantener dentro del canvas
+        float maxX = (picLienzo.Width - 1) / _zoom;
+        float maxY = (picLienzo.Height - 1) / _zoom;
+        next = new PointF(
+            Math.Clamp(next.X, 0, maxX),
+            Math.Clamp(next.Y, 0, maxY));
+
+        _keyCursor = next;
+        _rawPath.Add(next);
+        RebuildPlan();
+
+        float cmX = next.X / GridSize * 5f;
+        float cmY = next.Y / GridSize * 5f;
+        SetStatus($"Cursor: ({cmX:F0} cm, {cmY:F0} cm) | Flechas=dibujar  Retroceso=deshacer", FluentPalette.AccentPrimary);
+    }
+
+    // Deshace el último paso del cursor de teclado
+    private void UndoLastKeyStep()
+    {
+        if (_rawPath.Count > 1)
+        {
+            _rawPath.RemoveAt(_rawPath.Count - 1);
+            _keyCursor = _rawPath[^1];
+            RebuildPlan();
+            SetStatus("Último paso deshecho", FluentPalette.TextSecondary);
+        }
+        else if (_rawPath.Count == 1)
+        {
+            _keyCursor = _rawPath[0];
+            _rawPath.Clear();
+            RebuildPlan();
+            SetStatus("Trazo limpio — cursor listo", FluentPalette.TextSecondary);
+        }
     }
 
     private void HighlightArrow(Label lbl)
@@ -192,6 +281,8 @@ public partial class Form1 : Form
             _rawPath.Clear();
             _rawPath.Add(snapped);
         }
+        // Sincronizar cursor de teclado con el punto de click
+        _keyCursor = snapped;
         RebuildPlan();
     }
 
@@ -276,6 +367,7 @@ public partial class Form1 : Form
     private void btnLimpiar_Click(object sender, EventArgs e)
     {
         _rawPath.Clear();
+        _keyCursor = null;
         RebuildPlan();
         SetStatus("Estado: Lienzo limpio", FluentPalette.TextSecondary);
     }
@@ -336,6 +428,19 @@ public partial class Form1 : Form
             using Brush endBrush = new SolidBrush(Color.Firebrick);
             e.Graphics.FillEllipse(startBrush, start.X - 4, start.Y - 4, 8, 8);
             e.Graphics.FillEllipse(endBrush, end.X - 4, end.Y - 4, 8, 8);
+        }
+
+        // Cursor de teclado: cruz naranja con círculo
+        if (_keyCursor.HasValue && !_manualMode)
+        {
+            float cx = _keyCursor.Value.X;
+            float cy = _keyCursor.Value.Y;
+            float r  = 7f;
+            float arm = 12f;
+            using Pen cursorPen = new(Color.Orange, 2.5f / _zoom);
+            e.Graphics.DrawEllipse(cursorPen, cx - r, cy - r, r * 2, r * 2);
+            e.Graphics.DrawLine(cursorPen, cx - arm, cy, cx + arm, cy);
+            e.Graphics.DrawLine(cursorPen, cx, cy - arm, cx, cy + arm);
         }
     }
 
